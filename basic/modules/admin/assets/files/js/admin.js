@@ -14,12 +14,19 @@ $(document).ready(function () {
     });
 
     $('#user-user_phone').mask('(999) 999-9999');
+    $('#user-spin_id').mask('9999-9999');
+    $('#user-orcid').mask('9999-9999-9999-9999');
+    $('#user-researcher_id').mask('a-9999-9999');
+    $('#user-scopus_id').mask('99999999999');
+
+    $('#add-input-btn').click(function() {
+        $('<input class="post-input-file" type="file" name="UploadForm[files][]"' +
+            'accept="application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/pdf">').appendTo(".field-uploadform-files");
+    });
 
     $('#top_user-link').click(function () {
         $('#top_user-opts').toggleClass('active');
     });
-
-    //$("<div class='delete-file-input'></div>").insertAfter($('.uploadform-file'));
 
     $('.delete-file').click(function () {
         var $fileId = $(this).data('id');
@@ -37,14 +44,12 @@ $(document).ready(function () {
     });
 
     $('#added-files').on('click', '.added-item_descsave', function () {
-        var $imgId = $(this).data('imgid');
         var $parent = $(this).parent();
-        var $relatedInput = $parent.find("input[name='image[" + $imgId + "]']");
+        var $relatedInput = $parent.find('input');
         var $imgDesc = $relatedInput.val();
-        $.post("update?id=" + $imgId,
+        $.post($(this).data('urlupdate'),
             {
-                imgdesc : $imgDesc,
-                _csrf : '<?=Yii::$app->request->getCsrfToken()?>'
+                imgdesc : $imgDesc
             },
             function(response) {
                 if (response == 'Ok') {
@@ -59,15 +64,14 @@ $(document).ready(function () {
     $('#added-files').on('click', '.delete-added-img', function () {
         var $imgId = $(this).data('imgid');
         var $addedItem = $(this).closest('.added-item');
-        $.post("image-delete",
+        $.post($(this).data('urldelete'),
             {
-                id : $imgId,
-                _csrf : '<?=Yii::$app->request->getCsrfToken()?>'
+                id : $imgId
             },
             function(response) {
                 if (response == 'Ok') {
                     $addedItem.addClass('prehide');
-                    setTimeout(function () { $addedItem.remove(); }, 1000);
+                    setTimeout(function () { $addedItem.remove(); }, 500);
                 }
             }
         );
@@ -84,9 +88,9 @@ $(document).ready(function () {
                         "<div class='added-item_info'>" +
                         "<label>Описание</label>" +
                         "<div class='input-desc_container'><input type='text' class='form-control added-item_desc' name='image[" +
-                        file.id + "]' maxlength='255'><span class='checksave'>Сохранено</span><div data-imgid='" +
-                        file.id + "' data-title='Сохранить' class='added-item_descsave'>Сохранить</div></div>" +
-                        "<span data-imgid='" + file.id + "' class='delete-added-img'>Удалить</span></div></div>")
+                        file.id + "]' maxlength='255'><span class='checksave'>Сохранено</span><div data-urlupdate='" +
+                        file.updateUrl + "' data-title='Сохранить' class='added-item_descsave'>Сохранить</div></div>" +
+                        "<span data-imgid='" + file.id + "' data-urldelete='" + file.deleteUrl + "' class='delete-added-img'>Удалить</span></div></div>")
                 );
             });
         },
@@ -99,14 +103,69 @@ $(document).ready(function () {
         }
     });
 
-    $('#delete-selected-rows').click(function() {
-        var achecked = [];
-        var checks = document.getElementsByName("selection[]");
-        for(var i=0;i<checks.length;i++) {
-            if (checks[i].checked) { //если флаг был выделен заносим его в конец массива
-                achecked.push($(checks[i]).val());
-            }
+    $('#fileupload2').fileupload({
+        dataType: 'json',
+        done: function (e, data) {
+            $('#user_img').attr('src', '/images/users/' + data.result.files[0].name);
+            $('#delete-avatar').attr('data-image', data.result.files[0].name);
+            $('#delete-avatar').css('display', 'inline-block');
+            $('input[name="avatar"]').val(data.result.files[0].name);
         }
-        console.log(achecked);
+    });
+
+    $('#delete-avatar').click(function () {
+        var imageName = $(this).data('image');
+        var url = $(this).data('url');
+        var uid = $(this).data('id');
+        $.post(url,
+            {
+                name: imageName,
+                uid: uid
+            },
+            function onAjaxSuccess(response) {
+                if (response == 'Ok') {
+                    $('#user_img').attr('src', '/images/users/user-default.png' );
+                    $('#delete-avatar').attr('data-image', '');
+                    $('#delete-avatar').css('display', 'none');
+                    $('input[name="avatar"]').val('');
+                } else {
+                    console.log(response);
+                }
+            }
+        )
+    });
+
+    $('input[type="checkbox"]').click(function() {
+        setTimeout(function () {
+            var checks = document.getElementsByName('selection[]');
+            var counter = 0;
+            $(checks).each(function(indx) {
+                if ($(this).prop('checked')) {
+                    counter++;
+                }
+            });
+            $('.multi-delete span').text(counter);
+        }, 100);
+    });
+
+    $('.multi-delete').click(function(e) {
+        e.preventDefault();
+        var checks = $('input[name="selection[]"]:checked');
+        var mass = [];
+        $(checks).each(function(indx) {
+            mass.push(parseInt($(this).val()));
+        });
+        $.post($(this).data('url'),
+            {
+                mass : mass
+            },
+            function onAjaxSuccess(response) {
+                if (response == 'Files deleted') {
+                    location.reload(true);
+                } else {
+                    console.log('Нечего удалять');
+                }
+            }
+        );
     });
 });
